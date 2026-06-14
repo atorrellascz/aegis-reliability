@@ -1,0 +1,24 @@
+# --- Build output ---
+target/
+*.jar
+*.war
+
+# --- IntelliJ / IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# --- Maven wrapper (keep config, ignore the downloaded jar if present) ---
+.mvn/wrapper/maven-wrapper.jar
+
+# --- Secrets & local env (committed counterpart is .env.example) ---
+.env
+*.local
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log

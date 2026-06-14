@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aegis
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    # Lets the container reach the app running on the host (mvn spring-boot:run).
+    # On Docker Desktop this name resolves automatically; the mapping below makes
+    # it work on plain Linux Docker too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      # Credentials come from the environment (or a local .env file), never
+      # hardcoded in the repo. Defaults are provided for a frictionless local
+      # run; override them in .env for anything shared.
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Lock the instance down: login required, no open self-registration.
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      # Datasource + dashboard provider configs, applied automatically on boot.
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      # The dashboard JSON files the provider loads.
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

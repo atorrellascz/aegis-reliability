@@ -1,0 +1,16 @@
+# Prometheus scrape configuration for Aegis.
+# Prometheus runs in Docker; the app runs on the host (mvn spring-boot:run),
+# so we scrape it through host.docker.internal rather than a container name.
+
+global:
+  scrape_interval: 5s        # how often to pull metrics; 5s gives a responsive demo
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: aegis
+    # Spring Boot Actuator exposes metrics in Prometheus format at this path.
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          application: aegis

@@ -1,0 +1,15 @@
+# Grafana datasource provisioning: wires Grafana to Prometheus automatically on
+# boot, so there is nothing to click through in the UI to get the dashboard live.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: aegis-prometheus
+    type: prometheus
+    access: proxy
+    # Container-to-container: Grafana reaches Prometheus by its compose service
+    # name on the shared Docker network, not via localhost.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

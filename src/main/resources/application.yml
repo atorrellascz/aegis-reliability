@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: aegis-reliability-layer
+  datasource:
+    url: jdbc:postgresql://localhost:5433/aegis
+    username: aegis
+    password: aegis
+    hikari:
+      # Connection pool is itself a reliability control: it bounds how many
+      # connections we can ever open against Postgres, protecting the DB from
+      # connection storms. Pool exhaustion is a classic incident cause.
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000   # fail fast rather than pile up waiting threads
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# --- Anthropic (optional). Without a key, the LLM client throws and the
+#     circuit breaker + fallback path are exercised, so the app runs offline. ---
+aegis:
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-sonnet-4-20250514
+  # How long a processed Idempotency-Key is remembered in Redis. Long enough to
+  # absorb an agent's retry window; short enough that the store stays bounded.
+  idempotency:
+    ttl: 24h
+
+# --- Resilience4j ---
+resilience4j:
+  circuitbreaker:
+    instances:
+      llm:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50          # open if >=50% of last 10 calls fail
+        wait-duration-in-open-state: 10s    # stay open 10s, then probe
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      llm:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2   # 200ms, 400ms, 800ms
+        enable-randomized-wait: true        # jitter, to avoid synchronized retries
+  timelimiter:
+    instances:
+      llm:
+        timeout-duration: 9s
+  bulkhead:
+    instances:
+      llm:
+        max-concurrent-calls: 25            # cap in-flight LLM calls (isolate blast radius)
+
+# --- Observability: expose RED-style metrics in Prometheus format ---
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  metrics:
+    tags:
+      service: aegis
+    distribution:
+      # Publish histogram buckets so Prometheus/Grafana can compute p95/p99
+      # latency with histogram_quantile(). Without this, only _count and _sum
+      # exist and percentile panels stay empty.
+      percentiles-histogram:
+        http.server.requests: true
+        aegis.triage.duration: true
+      # Bucket boundaries aligned to latency SLO thresholds we care about, so the
+      # histogram has resolution exactly where it matters for alerting.
+      slo:
+        http.server.requests: 100ms, 300ms, 1s

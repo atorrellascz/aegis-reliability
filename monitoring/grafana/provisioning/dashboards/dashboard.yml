@@ -1,0 +1,17 @@
+# Grafana dashboard provider: tells Grafana to load any dashboard JSON it finds
+# in the mounted folder, so our RED dashboard appears automatically on boot.
+
+apiVersion: 1
+
+providers:
+  - name: Aegis
+    type: file
+    # Don't let the UI move dashboards into folders; keep them as defined in code.
+    disableDeletion: false
+    # Re-read the JSON files periodically so edits show up without a restart.
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      # Path INSIDE the container, matching the volume mount in docker-compose.yml.
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
